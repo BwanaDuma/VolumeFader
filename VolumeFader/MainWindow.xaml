@@ -8,10 +8,10 @@
         WindowStyle="ToolWindow"
         MinWidth="200"
         MaxWidth="200"
-        Title="Master Volume Control"
+        Title="Master A/V Dashboard"
         SourceInitialized="Window_SourceInitialized"
         Closing="Window_Closing">
-    <Window.Resources>
+    <Window.Resources>                
         <Style x:Key="FaderSliderStyle" TargetType="Slider">
             <Setter Property="Orientation" Value="Vertical"/>
             <Setter Property="Minimum" Value="0"/>
@@ -125,13 +125,14 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-        <SolidColorBrush x:Key="Button.MouseOver.Background" Color="#FFBEE6FD"/>
-        <SolidColorBrush x:Key="Button.MouseOver.Border" Color="#FF3C7FB1"/>
-        <SolidColorBrush x:Key="Button.Pressed.Background" Color="#FFC4E5F6"/>
-        <SolidColorBrush x:Key="Button.Pressed.Border" Color="#FF2C628B"/>
-        <SolidColorBrush x:Key="Button.Disabled.Background" Color="#FFF4F4F4"/>
-        <SolidColorBrush x:Key="Button.Disabled.Border" Color="#FFADB2B5"/>
-        <SolidColorBrush x:Key="Button.Disabled.Foreground" Color="#FF838383"/>
+        
+        <SolidColorBrush x:Key="Button.MouseOver.Background" Color="LimeGreen"/>
+        <SolidColorBrush x:Key="Button.MouseOver.Border" Color="DarkGreen"/>
+        <SolidColorBrush x:Key="Button.Pressed.Background" Color="Firebrick"/>
+        <SolidColorBrush x:Key="Button.Pressed.Border" Color="Red"/>
+        <SolidColorBrush x:Key="Button.Disabled.Background" Color="#FF272727"/>
+        <SolidColorBrush x:Key="Button.Disabled.Border" Color="Firebrick"/>
+        <SolidColorBrush x:Key="Button.Disabled.Foreground" Color="WhiteSmoke"/>
         <ControlTemplate x:Key="MuteToggleButtonStyle2" TargetType="{x:Type ButtonBase}">
             <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="true">
                 <ContentPresenter x:Name="contentPresenter" Focusable="False" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" Margin="{TemplateBinding Padding}" RecognizesAccessKey="True" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
@@ -243,6 +244,43 @@
             </LinearGradientBrush.GradientStops>
         </LinearGradientBrush>        
        
+        <Style x:Key="GridButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource Button.MouseOver.Background}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Button.MouseOver.Border}" />
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource Button.MouseOver.Background}"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource Button.MouseOver.Border}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource Button.Pressed.Background}"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource Button.Pressed.Border}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource Button.Disabled.Background}"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource Button.Disabled.Border}"/>
+                                <Setter Property="Foreground" Value="{StaticResource Button.Disabled.Foreground}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
     
     <Window.Background>
@@ -255,6 +293,8 @@
 
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="100"/>
+            <RowDefinition Height="100"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -263,8 +303,120 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
+        <Grid Grid.Column="0" Grid.Row="0" Grid.ColumnSpan="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="50"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Projector Power" 
+                       FontSize="16" 
+                       FontWeight="Bold" 
+                       Foreground="White"
+                       HorizontalAlignment="Left" 
+                       VerticalAlignment="Center"
+                       Grid.Column="0"
+                       Grid.ColumnSpan="2"
+                       Margin="10"/>
+            <Button x:Name="ProjectorOnButton"
+                    Style="{StaticResource GridButtonStyle}"
+                    Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="1"
+                    Width="65"
+                    Height="40"
+                    HorizontalAlignment="Center" Content="ON"
+                    FontSize="14"
+                    FontWeight="Bold"
+                    Foreground="Black"
+                    Click="ProjectorOnButton_Click">
+                <Button.Background>
+                    <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                        <GradientStop Color="LightGray" />
+                        <GradientStop Color="WhiteSmoke" Offset="0.5" />
+                        <GradientStop Color="LightGray" Offset="1" />
+                    </LinearGradientBrush>
+                </Button.Background>
+            </Button>
+            <Button x:Name="ProjectorOffButton"
+                    Style="{StaticResource GridButtonStyle}"
+                    Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="1"
+                    Width="65"
+                    Height="40"
+                    HorizontalAlignment="Center" Content="OFF"
+                    FontSize="14"
+                    FontWeight="Bold"
+                    Foreground="Black"
+                    Click="ProjectorOffButton_Click">
+                <Button.Background>
+                    <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                        <GradientStop Color="LightGray" />
+                        <GradientStop Color="WhiteSmoke" Offset="0.5" />
+                        <GradientStop Color="LightGray" Offset="1" />
+                    </LinearGradientBrush>
+                </Button.Background>
+            </Button>            
+        </Grid>        
+        
+        <Grid Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="50"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Camera Tracking" 
+                       FontSize="16" 
+                       FontWeight="Bold" 
+                       Foreground="White"
+                       HorizontalAlignment="Left" 
+                       VerticalAlignment="Center"
+                       Grid.Column="0"
+                       Grid.ColumnSpan="2"
+                       Margin="10"/>
+            <Button x:Name="TrackingOnButton"
+                    Style="{StaticResource GridButtonStyle}"
+                    Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="1"
+                    Width="65"
+                    Height="40"
+                    HorizontalAlignment="Center" Content="ON"
+                    FontSize="14"
+                    FontWeight="Bold"
+                    Foreground="Black"
+                    Click="TrackingOnButton_Click">
+                <Button.Background>
+                    <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                        <GradientStop Color="LightGray" />
+                        <GradientStop Color="WhiteSmoke" Offset="0.5" />
+                        <GradientStop Color="LightGray" Offset="1" />
+                    </LinearGradientBrush>
+                </Button.Background>
+            </Button>
+            <Button x:Name="TrackingOffButton"
+                    Style="{StaticResource GridButtonStyle}"
+                    Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="1"
+                    Width="65"
+                    Height="40"
+                    HorizontalAlignment="Center" Content="OFF"
+                    FontSize="14"
+                    FontWeight="Bold"
+                    Foreground="Black"
+                    Click="TrackingOffButton_Click">
+                <Button.Background>
+                    <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                        <GradientStop Color="LightGray" />
+                        <GradientStop Color="WhiteSmoke" Offset="0.5" />
+                        <GradientStop Color="LightGray" Offset="1" />
+                    </LinearGradientBrush>
+                </Button.Background>
+            </Button>            
+        </Grid>      
+        
         <Slider x:Name="VolumeSlider"
-                Grid.Row="0" Grid.Column="0"
+                Grid.Row="2" Grid.Column="0"
                 Orientation="Vertical"
                 Minimum="0"
                 Maximum="100"
@@ -346,14 +498,14 @@
             </Slider.Template>
         </Slider>
         <ProgressBar x:Name="VuMeter"
-                     Grid.Row="0" Grid.Column="1"
+                     Grid.Row="2" Grid.Column="1"
                      Width="40"
                      Height="{Binding ActualHeight, ElementName=VolumeSlider}"
                      Margin="10"
                      Orientation="Vertical"
                      Style="{StaticResource VolumeMeter}"/>
         <ToggleButton Template="{DynamicResource MuteToggleButtonStyle2}" x:Name="MuteButton"
-                      Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                      Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
                       HorizontalAlignment="Center"
                       Style="{StaticResource MuteToggleButtonStyle}"
                       Checked="MuteButton_Checked"

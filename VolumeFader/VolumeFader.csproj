@@ -11,10 +11,14 @@
 
   <ItemGroup>
     <None Remove="Assets\Images\fader.png" />
+    <None Remove="deviceCommands.json" />
     <None Remove="volume-control.ico" />
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="deviceCommands.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="volume-control.ico" />
   </ItemGroup>
 

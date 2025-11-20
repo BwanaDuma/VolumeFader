@@ -2,13 +2,27 @@
 using System.ComponentModel;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Text.Json;
+using System.IO;
+using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace VolumeFader
 {
+    public class DeviceCommands
+    {
+        public string? ProjectorOnString { get; set; }
+        public string? ProjectorOffString1 { get; set; }
+        public string? ProjectorOffString2 { get; set; }
+        public string? TrackingOnString { get; set; }
+        public string? TrackingOffString { get; set; }
+        public bool? DebugMode { get; set; }
+    }
+
     public partial class MainWindow : Window
     {
         // Reference to your audio logic (better done via ViewModel in MVVM)
-        private AudioControlService _audioService;    
+        private AudioControlService _audioService;           
 
         public MainWindow()
         {
@@ -172,6 +186,161 @@ namespace VolumeFader
                  // You might want to use Properties.Settings.Default defaults here
             }
         }
-        
+
+        private async void ProjectorOnButton_Click(object sender, RoutedEventArgs e)
+        {
+            string filePath = Path.Combine(AppContext.BaseDirectory, "deviceCommands.json");
+
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    string json = File.ReadAllText(filePath);
+                    var commands = JsonSerializer.Deserialize<DeviceCommands>(json);
+
+                    if (!string.IsNullOrWhiteSpace(commands?.ProjectorOnString))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Sending Projector On command: {commands.ProjectorOnString}");
+                        await SendWebCommandAsync(commands.ProjectorOnString, (bool)commands?.DebugMode!);
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ERROR] deviceCommands.json not found at: {filePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ERROR] Failed to read or parse deviceCommands.json: {ex}");
+            }
+        }
+
+        private async void ProjectorOffButton_Click(object sender, RoutedEventArgs e)
+        {
+            string filePath = Path.Combine(AppContext.BaseDirectory, "deviceCommands.json");
+
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    string json = File.ReadAllText(filePath);
+                    var commands = JsonSerializer.Deserialize<DeviceCommands>(json);
+
+                    if (!string.IsNullOrWhiteSpace(commands?.ProjectorOffString1))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Sending Projector Off command 1: {commands.ProjectorOffString1}");
+                        await SendWebCommandAsync(commands.ProjectorOffString1, (bool)commands.DebugMode!);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(commands?.ProjectorOffString2))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Sending Projector Off command 2: {commands.ProjectorOffString2}");
+                        await SendWebCommandAsync(commands.ProjectorOffString2, (bool)commands.DebugMode!);
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ERROR] deviceCommands.json not found at: {filePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ERROR] Failed to read or parse deviceCommands.json: {ex}");
+            }
+        }
+
+        private async void TrackingOnButton_Click(object sender, RoutedEventArgs e)
+        {
+            string filePath = Path.Combine(AppContext.BaseDirectory, "deviceCommands.json");
+
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    string json = File.ReadAllText(filePath);
+                    var commands = JsonSerializer.Deserialize<DeviceCommands>(json);
+
+                    if (!string.IsNullOrWhiteSpace(commands?.TrackingOnString))
+                    {
+                        await SendWebCommandAsync(commands.TrackingOnString, (bool)commands?.DebugMode!);
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ERROR] deviceCommands.json not found at: {filePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ERROR] Failed to read or parse deviceCommands.json: {ex}");
+            }
+        }
+
+        private async void TrackingOffButton_Click(object sender, RoutedEventArgs e)
+        {
+            string filePath = Path.Combine(AppContext.BaseDirectory, "deviceCommands.json");
+
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    string json = File.ReadAllText(filePath);
+                    var commands = JsonSerializer.Deserialize<DeviceCommands>(json);
+
+                    if (!string.IsNullOrWhiteSpace(commands?.TrackingOffString))
+                    {
+                        await SendWebCommandAsync(commands.TrackingOffString, (bool)commands?.DebugMode!);
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ERROR] deviceCommands.json not found at: {filePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ERROR] Failed to read or parse deviceCommands.json: {ex}");
+            }
+        }
+
+        private async Task SendWebCommandAsync(string url, bool DebugMode = false)
+        {
+            if (DebugMode)
+                MessageBox.Show($"Sending command:\n{url}", "Command Sent", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            try
+            {
+                // Parse username and password from the URL if present
+                var uri = new Uri(url);
+                string username = uri.UserInfo.Split(':').FirstOrDefault();
+                string password = uri.UserInfo.Split(':').Skip(1).FirstOrDefault();
+
+                var handler = new HttpClientHandler();
+                if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+                {
+                    handler.Credentials = new System.Net.NetworkCredential(username, password);
+                    // Remove credentials from URL for the actual request
+                    url = $"{uri.Scheme}://{uri.Host}{(uri.IsDefaultPort ? "" : ":" + uri.Port)}{uri.PathAndQuery}";
+                }
+
+                using var httpClient = new HttpClient(handler);
+                var response = await httpClient.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                {
+                    if (DebugMode)
+                        MessageBox.Show($"Success: {response.StatusCode}", "Command Result", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show($"Command failed: {response.StatusCode}", "Command Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                    System.Diagnostics.Debug.WriteLine($"[ERROR] Command failed: {response.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}", "Command Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Diagnostics.Debug.WriteLine($"[ERROR] Exception sending web command: {ex}");
+            }
+        }
     }
 }
