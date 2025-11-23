@@ -1,11 +1,12 @@
-﻿using System.Windows;
+﻿using System;
 using System.ComponentModel;
-using System.Windows.Controls;
-using System.Windows.Media;
-using System.Text.Json;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Media;
 
 namespace VolumeFader
 {
@@ -22,7 +23,9 @@ namespace VolumeFader
     public partial class MainWindow : Window
     {
         // Reference to your audio logic (better done via ViewModel in MVVM)
-        private AudioControlService _audioService;           
+        private AudioControlService _audioService;
+        private Midi.MidiListenerService? _midiService;
+        private string _midiMapFile;
 
         public MainWindow()
         {
@@ -39,6 +42,22 @@ namespace VolumeFader
             // Set initial UI state
             UpdateVolumeSlider(_audioService.GetMasterVolume());
             UpdateMuteButton(_audioService.IsMuted());
+
+            _midiMapFile = Path.Combine(AppContext.BaseDirectory, "midiMappings.json");
+            _midiService = new Midi.MidiListenerService(_midiMapFile);
+            // start listening on default device if available
+            if (NAudio.Midi.MidiIn.NumberOfDevices > 0)
+            {
+                _midiService.Start(0);
+            }
+
+            // Add right-click menu to open config
+            this.MouseRightButtonUp += (s,e) => {
+                var cfg = new Midi.MidiConfigWindow(_midiMapFile, _midiService) { Owner = this };
+                cfg.ShowDialog();
+                // reload mappings after config window closes
+                _midiService.LoadMappings();
+            };
         }
 
         private void AudioService_PeakLevelChanged(object sender, float peak)
@@ -83,8 +102,8 @@ namespace VolumeFader
 
             // Create a LinearGradientBrush
             LinearGradientBrush gradientBrush = new LinearGradientBrush();
-            gradientBrush.StartPoint = new Point(0.5, 0);
-            gradientBrush.EndPoint = new Point(0.5,1);
+            gradientBrush.StartPoint = new System.Windows.Point(0.5, 0);
+            gradientBrush.EndPoint = new System.Windows.Point(0.5,1);
 
             // Add gradient stops (red to green)
             gradientBrush.GradientStops.Add(new GradientStop(Colors.Black, 0));
@@ -101,12 +120,12 @@ namespace VolumeFader
 
             // Create a LinearGradientBrush
             LinearGradientBrush gradientBrush = new LinearGradientBrush();
-            gradientBrush.StartPoint = new Point(0.5, 0);
-            gradientBrush.EndPoint = new Point(0.5,1);
+            gradientBrush.StartPoint = new System.Windows.Point(0.5, 0);
+            gradientBrush.EndPoint = new System.Windows.Point(0.5,1);
 
             // Add gradient stops (red to green)
             gradientBrush.GradientStops.Add(new GradientStop(Colors.Black, 0));
-            gradientBrush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#FF272727"), 0.5));
+            gradientBrush.GradientStops.Add(new GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#FF272727"), 0.5));
             gradientBrush.GradientStops.Add(new GradientStop(Colors.Black, 1));
 
             // Apply the gradient to the Border element
@@ -165,6 +184,7 @@ namespace VolumeFader
 
             // Clean up audio service
             _audioService?.Dispose();
+            _midiService?.Dispose();
         }
 
         private void EnsureWindowIsVisible()
@@ -306,12 +326,12 @@ namespace VolumeFader
         private async Task SendWebCommandAsync(string url, bool DebugMode = false)
         {
             if (DebugMode)
-                MessageBox.Show($"Sending command:\n{url}", "Command Sent", MessageBoxButton.OK, MessageBoxImage.Information);
+                System.Windows.MessageBox.Show($"Sending command:\n{url}", "Command Sent", MessageBoxButton.OK, MessageBoxImage.Information);
 
             try
             {
                 // Parse username and password from the URL if present
-                var uri = new Uri(url);
+                var uri = new System.Uri(url);
                 string username = uri.UserInfo.Split(':').FirstOrDefault();
                 string password = uri.UserInfo.Split(':').Skip(1).FirstOrDefault();
 
@@ -328,17 +348,17 @@ namespace VolumeFader
                 if (response.IsSuccessStatusCode)
                 {
                     if (DebugMode)
-                        MessageBox.Show($"Success: {response.StatusCode}", "Command Result", MessageBoxButton.OK, MessageBoxImage.Information);
+                        System.Windows.MessageBox.Show($"Success: {response.StatusCode}", "Command Result", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 else
                 {
-                    MessageBox.Show($"Command failed: {response.StatusCode}", "Command Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                    System.Windows.MessageBox.Show($"Command failed: {response.StatusCode}", "Command Failed", MessageBoxButton.OK, MessageBoxImage.Error);
                     System.Diagnostics.Debug.WriteLine($"[ERROR] Command failed: {response.StatusCode}");
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error: {ex.Message}", "Command Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show($"Error: {ex.Message}", "Command Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 System.Diagnostics.Debug.WriteLine($"[ERROR] Exception sending web command: {ex}");
             }
         }

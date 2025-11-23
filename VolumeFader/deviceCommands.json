@@ -1,0 +1,8 @@
+{
+  "ProjectorOnString": "http://user1:panasonic@192.168.1.202/cgi-bin/power_on.cgi",
+  "ProjectorOffString1": "http://user1:panasonic@192.168.1.202/cgi-bin/power_ctl.cgi?key=pow_off&lang=e&from=BASIC_CTL",
+  "ProjectorOffString2": "http://user1:panasonic@192.168.1.202/cgi-bin/power_off.cgi",
+  "TrackingOnString": "http://admin:Blessings24x7@192.168.10.66/cgi-bin/param.cgi?set_overlay&autotracking&on",
+  "TrackingOffString": "http://admin:Blessings24x7@192.168.10.66/cgi-bin/param.cgi?set_overlay&autotracking&off",
+  "DebugMode": false
+}

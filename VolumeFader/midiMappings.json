@@ -1,0 +1,12 @@
+{
+  "Mappings": [
+    {
+      "Name": "Example Note On",
+      "Channel": 0,
+      "Command": 144,
+      "Data1": 60,
+      "Data2": 127,
+      "Keys": "{ENTER}"
+    }
+  ]
+}
