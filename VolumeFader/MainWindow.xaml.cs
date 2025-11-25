@@ -48,7 +48,7 @@ namespace VolumeFader
             // start listening on default device if available
             if (NAudio.Midi.MidiIn.NumberOfDevices > 0)
             {
-                _midiService.Start(0);
+                _midiService.Start(-1);
             }
 
             // Add right-click menu to open config
@@ -362,5 +362,7 @@ namespace VolumeFader
                 System.Diagnostics.Debug.WriteLine($"[ERROR] Exception sending web command: {ex}");
             }
         }
+
+        public Midi.MidiListenerService? MidiService => _midiService;
     }
 }

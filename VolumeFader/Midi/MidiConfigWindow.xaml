@@ -12,6 +12,7 @@
             <Label Content="MIDI Device:" VerticalAlignment="Center"/>
             <ComboBox x:Name="DeviceCombo" Width="300" Margin="10,0,0,0"/>
             <Button x:Name="StartListenButton" Content="Start" Margin="10,0,0,0" Click="StartListenButton_Click" />
+            <Button x:Name="StopListenButton" Content="Stop" Margin="10,0,0,0" Click="StopListenButton_Click" IsEnabled="False" />
         </StackPanel>
 
         <DataGrid x:Name="MappingsGrid" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="True">

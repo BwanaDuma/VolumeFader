@@ -35,7 +35,7 @@ namespace VolumeFader
                     _volumeControl.OnVolumeNotification += OnSystemVolumeNotification;
 
                     // Setup timer for VU Meter updates (e.g., 20 times per second)
-                    _peakMeterTimer = new System.Timers.Timer(500); // 50ms interval
+                    _peakMeterTimer = new System.Timers.Timer(50); // 50ms interval
                     _peakMeterTimer.Elapsed += PeakMeterTimer_Elapsed;
                     _peakMeterTimer.AutoReset = true;
                     _peakMeterTimer.Start();

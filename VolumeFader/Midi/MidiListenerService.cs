@@ -6,14 +6,16 @@ using NAudio.Midi;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Linq;
+using System.ComponentModel;
 
 namespace VolumeFader.Midi
 {
-    public class MidiListenerService : IDisposable
+    public class MidiListenerService : IDisposable, INotifyPropertyChanged
     {
         private MidiIn? _midiIn;
         private MidiMappingsFile _mappings = new MidiMappingsFile();
         private string _mapFilePath;
+        private string _defaultMidiDevice = "loopMIDI Port";
 
         public MidiListenerService(string mapFilePath)
         {
@@ -24,28 +26,81 @@ namespace VolumeFader.Midi
         // Indicates whether the service currently has an open MIDI input
         public bool IsRunning => _midiIn != null;
 
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         public void Start(int deviceIndex = 0)
         {
             if (MidiIn.NumberOfDevices == 0) return;
-            if (deviceIndex < 0 || deviceIndex >= MidiIn.NumberOfDevices) deviceIndex = 0;
+
+            int chosenIndex = deviceIndex;
+
+            // If provided index is out of range, try to find the configured default device by name
+            if (deviceIndex < 0 || deviceIndex >= MidiIn.NumberOfDevices)
+            {
+                chosenIndex = -1;
+                for (int i = 0; i < MidiIn.NumberOfDevices; i++)
+                {
+                    try
+                    {
+                        var info = MidiIn.DeviceInfo(i);
+                        if (!string.IsNullOrEmpty(info.ProductName) && info.ProductName.IndexOf(_defaultMidiDevice, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            chosenIndex = i;
+                            break;
+                        }
+                    }
+                    catch
+                    {
+                        // ignore device info read errors and continue
+                    }
+                }
+
+                if (chosenIndex == -1)
+                {
+                    System.Diagnostics.Debug.WriteLine($"No valid MIDI device index provided and no device matching '{_defaultMidiDevice}' was found. Aborting Start.");
+                    return;
+                }
+            }
 
             // Prevent attempting to open the device if already started in this process
             if (_midiIn != null)
             {
                 // Already running; no-op
+                System.Diagnostics.Debug.WriteLine($"MIDI listener already running (deviceIndex={chosenIndex}).");
                 return;
             }
 
             try
             {
-                _midiIn = new MidiIn(deviceIndex);
+                _midiIn = new MidiIn(chosenIndex);
                 _midiIn.MessageReceived += MidiIn_MessageReceived;
                 _midiIn.ErrorReceived += MidiIn_ErrorReceived;
                 _midiIn.Start();
+
+                // Debug: indicate listener started and show device info
+                try
+                {
+                    var info = MidiIn.DeviceInfo(chosenIndex);
+                    System.Diagnostics.Debug.WriteLine($"MIDI listener started on device {chosenIndex}: {info.ProductName}");
+                }
+                catch
+                {
+                    System.Diagnostics.Debug.WriteLine($"MIDI listener started on device {chosenIndex}.");
+                }
+
+                // Additional status line to make it explicit when the listener is running
+                System.Diagnostics.Debug.WriteLine($"MIDI listener running: {IsRunning} (deviceIndex={chosenIndex})");
+
+                // Notify bindings that IsRunning changed
+                OnPropertyChanged(nameof(IsRunning));
             }
             catch (NAudio.MmException mmex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to open MIDI device {deviceIndex}: {mmex}");
+                System.Diagnostics.Debug.WriteLine($"Failed to open MIDI device {chosenIndex}: {mmex}");
                 throw;
             }
         }
@@ -54,11 +109,35 @@ namespace VolumeFader.Midi
         {
             if (_midiIn != null)
             {
-                _midiIn.Stop();
-                _midiIn.MessageReceived -= MidiIn_MessageReceived;
-                _midiIn.ErrorReceived -= MidiIn_ErrorReceived;
-                _midiIn.Dispose();
-                _midiIn = null;
+                try
+                {
+                    // Try to capture device info for logging
+                    int idx = 0;
+                    var name = "";
+                    //try { idx = _midiIn.DeviceNumber; } catch { }
+                    try { name = MidiIn.DeviceInfo(idx).ProductName; } catch { }
+
+                    _midiIn.Stop();
+                    _midiIn.MessageReceived -= MidiIn_MessageReceived;
+                    _midiIn.ErrorReceived -= MidiIn_ErrorReceived;
+                    _midiIn.Dispose();
+                    _midiIn = null;
+
+                    System.Diagnostics.Debug.WriteLine($"MIDI listener stopped on device {idx}: {name}");
+
+                    // Notify bindings that IsRunning changed
+                    OnPropertyChanged(nameof(IsRunning));
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error stopping MIDI listener: {ex}");
+                    _midiIn = null;
+                    OnPropertyChanged(nameof(IsRunning));
+                }
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("MIDI listener Stop called but it was not running.");
             }
         }
 
