@@ -511,7 +511,7 @@
                       Style="{StaticResource MuteToggleButtonStyle}"
                       Checked="MuteButton_Checked"
                       Unchecked="MuteButton_Unchecked"/>
-        <Grid Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" VerticalAlignment="Center" x:Name="ListenerStatusGrid" MouseRightButtonUp="ListenerStatus_MouseRightButtonUp">
+        <Grid Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" VerticalAlignment="Center" x:Name="ListenerStatusGrid" MouseRightButtonUp="ListenerStatus_MouseRightButtonUp" MouseLeftButtonUp="ListenerStatus_MouseLeftButtonUp">
             <!-- Not listening state -->
             <TextBlock x:Name="NotListeningText" FontSize="24" FontWeight="Bold" Foreground="Yellow" Text="NOT LISTENING" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <TextBlock.Style>

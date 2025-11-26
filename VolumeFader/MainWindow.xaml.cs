@@ -75,6 +75,9 @@ namespace VolumeFader
                     };
                 }
 
+                // Subscribe to property changes to track IsRunning and animate "NOT LISTENING"
+                _midiService.PropertyChanged += MidiService_PropertyChanged;
+
                 System.Diagnostics.Debug.WriteLine("MainWindow: subscribed to MIDI service debug events");
             }
 
@@ -82,15 +85,7 @@ namespace VolumeFader
             if (NAudio.Midi.MidiIn.NumberOfDevices > 0)
             {
                 _midiService.Start(-1);
-            }
-
-            // Add right-click menu to open config
-            //this.MouseRightButtonUp += (s,e) => {
-            //    var cfg = new Midi.MidiConfigWindow(_midiMapFile, _midiService) { Owner = this };
-            //    cfg.ShowDialog();
-            //    // reload mappings after config window closes
-            //    _midiService.LoadMappings();
-            //};
+            }         
         }
 
         private void AudioService_PeakLevelChanged(object sender, float peak)
@@ -499,6 +494,129 @@ namespace VolumeFader
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error opening MIDI config: {ex}");
+            }
+        }
+
+        private DateTime _lastLeftClick = DateTime.MinValue;
+        private readonly TimeSpan _doubleClickWindow = TimeSpan.FromMilliseconds(1000);
+
+        private void ListenerStatus_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            try
+            {
+                var now = DateTime.UtcNow;
+                if (now - _lastLeftClick <= _doubleClickWindow)
+                {
+                    // Detected simulated double-click
+                    _lastLeftClick = DateTime.MinValue;
+                    ToggleMidiListener();
+                }
+                else
+                {
+                    _lastLeftClick = now;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error handling left click: {ex}");
+            }
+        }
+
+        private void ToggleMidiListener()
+        {
+            try
+            {
+                if (_midiService == null && _midiService == null) return; // defensively check both names
+
+                var service = _midiService ?? _midiService;
+                if (service == null) return;
+
+                if (service.IsRunning)
+                {
+                    service.Stop();
+                    System.Diagnostics.Debug.WriteLine("MIDI listener stopped via simulated double-click.");
+                }
+                else
+                {
+                    try
+                    {
+                        service.Start(-1);
+                        System.Diagnostics.Debug.WriteLine("MIDI listener started via simulated double-click.");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Failed to start MIDI listener via UI: {ex}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ToggleMidiListener exception: {ex}");
+            }
+        }
+
+        private CancellationTokenSource? _notListeningCts;
+
+        private void MidiService_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(Midi.MidiListenerService.IsRunning))
+            {
+                // If service stopped, start NOT LISTENING animation; if started, cancel it
+                var running = _midiService?.IsRunning ?? false;
+                if (!running)
+                {
+                    // start animation loop
+                    _ = AnimateNotListeningLoop();
+                }
+                else
+                {
+                    // cancel any running not-listening animation and reset color
+                    try { _notListeningCts?.Cancel(); } catch { }
+                    Dispatcher.Invoke(() => {
+                        if (NotListeningText != null)
+                            NotListeningText.Foreground = System.Windows.Media.Brushes.Yellow;
+                    });
+                }
+            }
+        }
+
+        private async Task AnimateNotListeningLoop()
+        {
+            // Cancel existing animation and start a fresh one
+            _notListeningCts?.Cancel();
+            _notListeningCts = new CancellationTokenSource();
+            var token = _notListeningCts.Token;
+
+            try
+            {
+                while (!token.IsCancellationRequested && (_midiService?.IsRunning == false))
+                {
+                    // Set DarkGray
+                    Dispatcher.Invoke(() => {
+                        if (NotListeningText != null)
+                            NotListeningText.Foreground = System.Windows.Media.Brushes.Black;
+                    });
+
+                    await Task.Delay(250, token);
+
+                    // Set Yellow
+                    Dispatcher.Invoke(() => {
+                        if (NotListeningText != null)
+                            NotListeningText.Foreground = System.Windows.Media.Brushes.Yellow;
+                    });
+
+                    await Task.Delay(250, token);
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"AnimateNotListeningLoop exception: {ex}");
+            }
+            finally
+            {
+                try { _notListeningCts?.Dispose(); } catch { }
+                _notListeningCts = null;
             }
         }
     }
