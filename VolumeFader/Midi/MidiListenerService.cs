@@ -9,6 +9,7 @@ using System.Linq;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Threading;
 
 namespace VolumeFader.Midi
 {
@@ -44,6 +45,14 @@ namespace VolumeFader.Midi
         public event Action<string>? DebugMessageLogged;
         // Event raised when a MIDI message is received (for UI animation triggers)
         public event Action? MidiMessageReceived;
+
+        // Monitor for device removal (initial detection only)
+        private int? _activeDeviceIndex;
+        private string? _activeDeviceName;
+
+        // Expose active device information for UI
+        public int? ActiveDeviceIndex => _activeDeviceIndex;
+        public string? ActiveDeviceName => _activeDeviceName;
 
         private void Log(string message)
         {
@@ -94,9 +103,9 @@ namespace VolumeFader.Midi
             catch { }
         }
 
-        public void Start(int deviceIndex = 0)
+        public bool Start(int deviceIndex = 0)
         {
-            if (MidiIn.NumberOfDevices == 0) return;
+            if (MidiIn.NumberOfDevices == 0) return false;
 
             int chosenIndex = deviceIndex;
 
@@ -124,7 +133,7 @@ namespace VolumeFader.Midi
                 if (chosenIndex == -1)
                 {
                     Log($"No valid MIDI device index provided and no device matching '{_defaultMidiDevice}' was found. Aborting Start.");
-                    return;
+                    return false;
                 }
             }
 
@@ -133,7 +142,7 @@ namespace VolumeFader.Midi
             {
                 // Already running; no-op
                 Log($"MIDI listener already running (deviceIndex={chosenIndex}).");
-                return;
+                return true;
             }
 
             try
@@ -148,10 +157,15 @@ namespace VolumeFader.Midi
                 {
                     var info = MidiIn.DeviceInfo(chosenIndex);
                     Log($"MIDI listener started on device {chosenIndex}: {info.ProductName}");
+                    // record active device index/name for informational purposes (no runtime polling)
+                    _activeDeviceIndex = chosenIndex;
+                    _activeDeviceName = info.ProductName;
                 }
                 catch
                 {
                     Log($"MIDI listener started on device {chosenIndex}.");
+                    _activeDeviceIndex = chosenIndex;
+                    try { _activeDeviceName = MidiIn.DeviceInfo(chosenIndex).ProductName; } catch { _activeDeviceName = null; }
                 }
 
                 // Additional status line to make it explicit when the listener is running
@@ -159,16 +173,29 @@ namespace VolumeFader.Midi
 
                 // Notify bindings that IsRunning changed
                 OnPropertyChanged(nameof(IsRunning));
+
+                return true;
             }
             catch (NAudio.MmException mmex)
             {
                 Log($"Failed to open MIDI device {chosenIndex}: {mmex}");
-                throw;
+                return false;
             }
         }
 
         public void Stop()
         {
+            try
+            {
+                // stop device monitor first
+                //try { _deviceMonitorCts?.Cancel(); } catch { }
+                //try { _deviceMonitorCts?.Dispose(); } catch { }
+                //_deviceMonitorCts = null;
+                //_activeDeviceIndex = null;
+                //_activeDeviceName = null;
+            }
+            catch { }
+
             if (_midiIn != null)
             {
                 try
@@ -202,6 +229,70 @@ namespace VolumeFader.Midi
                 Log("MIDI listener Stop called but it was not running.");
             }
         }
+
+        //private void StartDeviceMonitor()
+        //{
+        //    try
+        //    {
+        //        _deviceMonitorCts?.Cancel();
+        //        try { _deviceMonitorCts?.Dispose(); } catch { }
+        //        _deviceMonitorCts = new CancellationTokenSource();
+        //        var token = _deviceMonitorCts.Token;
+
+        //        // Debug: device monitor started
+        //        Log("Device monitor started");
+
+        //        Task.Run(async () =>
+        //        {
+        //            while (!token.IsCancellationRequested)
+        //            {
+        //                try
+        //                {
+        //                    // Gather current device names
+        //                    int curCount = MidiIn.NumberOfDevices;
+        //                    var curNames = new System.Collections.Generic.List<string>();
+        //                    for (int i = 0; i < curCount; i++)
+        //                    {
+        //                        try
+        //                        {
+        //                            var info = MidiIn.DeviceInfo(i);
+        //                            curNames.Add(info.ProductName ?? string.Empty);
+        //                        }
+        //                        catch { curNames.Add(string.Empty); }
+        //                    }
+
+        //                    // If device list changed, raise DevicesChanged
+        //                    bool listChanged = curCount != _lastDeviceCount || !_lastDeviceNames.SequenceEqual(curNames);
+        //                    if (listChanged)
+        //                    {
+        //                        _lastDeviceCount = curCount;
+        //                        _lastDeviceNames = curNames.ToArray();
+        //                        try { DevicesChanged?.Invoke(); } catch { }
+        //                    }
+
+        //                    // Detect presence of configured default (loopMIDI)
+        //                    bool foundLoop = curNames.Any(n => !string.IsNullOrEmpty(n) && n.IndexOf(_defaultMidiDevice, StringComparison.OrdinalIgnoreCase) >= 0);
+
+        //                    // Debug: log device monitor status
+        //                    Log($"Device monitor check: found={foundLoop}, devices={curCount}");
+
+        //                    if (!foundLoop)
+        //                    {
+        //                        // Device removed
+        //                        Log("Device monitor: device not found — invoking disconnect sequence");
+        //                        try { Stop(); } catch { }
+        //                        try { DeviceDisconnected?.Invoke(); } catch { }
+        //                        break;
+        //                    }
+        //                }
+        //                catch { }
+
+        //                try { await Task.Delay(TimeSpan.FromSeconds(5), token); } catch (OperationCanceledException) { break; }
+        //            }
+        //        }, token);
+        //    }
+        //    catch { }
+        //}
 
         private void MidiIn_ErrorReceived(object sender, MidiInMessageEventArgs e)
         {
@@ -455,7 +546,17 @@ namespace VolumeFader.Midi
 
         public void Dispose()
         {
-            Stop();
+            //try { _deviceMonitorCts?.Cancel(); } catch { }
+            //try { _deviceMonitorCts?.Dispose(); } catch { }
+            //_deviceMonitorCts = null;
+            try
+            {
+                Stop();
+            }
+            catch (Exception ex)
+            {
+                Log($"Failed to stop midi listener: {ex}");
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -55,7 +56,7 @@ namespace VolumeFader
             if (_midiService != null)
             {
                 _midiService.DebugMessageLogged += (msg) => {
-                    // schedule animation on UI thread - start animation without awaiting
+                    // schedule animation on UI thread - start animation without awaited
                     Dispatcher.InvokeAsync(() => { _ = AnimateListeningRuns(); });
                 };
 
@@ -82,10 +83,44 @@ namespace VolumeFader
             }
 
             // start listening on default device if available
-            if (NAudio.Midi.MidiIn.NumberOfDevices > 0)
+            // Defer start logic to Loaded handler so we can use async/await
+            this.Loaded += MainWindow_Loaded;
+        }
+
+        private async void MainWindow_Loaded(object? sender, RoutedEventArgs e)
+        {
+            // Attempt initial start; if not found, show prompt and retry loop
+            bool started = false;
+            try
             {
-                _midiService.Start(-1);
-            }         
+                started = _midiService?.Start(-1) ?? false;
+            }
+            catch { started = false; }
+
+            if (!started)
+            {
+                // Show blocking wait dialog to the user and retry inside it
+                var dlg = new LoopMidiWaitWindow("The application loopMIDI is not running and must be started now!") { Owner = this };
+                var result = false;
+                // Show dialog modeless and run wait logic, but block caller until dialog completes
+                dlg.Show();
+                try
+                {
+                    result = await dlg.WaitFor(() => {
+                        try { return _midiService?.Start(-1) ?? false; } catch { return false; }
+                    }, TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(1));
+                }
+                finally
+                {
+                    dlg.Close();
+                }
+
+                if (!result)
+                {
+                    // Show final message box informing user the retry failed
+                    System.Windows.MessageBox.Show("Failed to start loopMIDI after retries.", "loopMIDI not running", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
         }
 
         private void AudioService_PeakLevelChanged(object sender, float peak)
@@ -617,6 +652,34 @@ namespace VolumeFader
             {
                 try { _notListeningCts?.Dispose(); } catch { }
                 _notListeningCts = null;
+            }
+        }
+
+        private async Task HandleDeviceDisconnectedAsync()
+        {
+            try
+            {
+                // Ensure listener is stopped
+                try { _midiService?.Stop(); } catch { }
+
+                var dlg = new LoopMidiWaitWindow("loopMIDI was stopped. Please start loopMIDI now to continue.") { Owner = this };
+                dlg.Show();
+                try
+                {
+                    bool ok = await dlg.WaitFor(() => { try { return _midiService?.Start(-1) ?? false; } catch { return false; } }, TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(1));
+                    if (!ok)
+                    {
+                        System.Windows.MessageBox.Show("Failed to restart loopMIDI after retries.", "loopMIDI not running", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                }
+                finally
+                {
+                    dlg.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"HandleDeviceDisconnectedAsync exception: {ex}");
             }
         }
     }

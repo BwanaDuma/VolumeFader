@@ -27,22 +27,7 @@ namespace VolumeFader.Midi
 
             // populate devices and auto-select the one containing DesiredDeviceName
             int selectIndex = -1;
-            for (int i = 0; i < NAudio.Midi.MidiIn.NumberOfDevices; i++)
-            {
-                var name = NAudio.Midi.MidiIn.DeviceInfo(i).ProductName;
-                DeviceCombo.Items.Add(name);
-                if (selectIndex == -1 && !string.IsNullOrEmpty(name) && name.IndexOf(DesiredDeviceName, StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    selectIndex = i;
-                }
-            }
-            if (DeviceCombo.Items.Count > 0)
-            {
-                if (selectIndex >= 0 && selectIndex < DeviceCombo.Items.Count)
-                    DeviceCombo.SelectedIndex = selectIndex;
-                else
-                    DeviceCombo.SelectedIndex = 0;
-            }
+            PopulateDeviceCombo();
 
             // Initial button states based on shared service
             StartListenButton.IsEnabled = !_service.IsRunning;
@@ -50,6 +35,9 @@ namespace VolumeFader.Midi
 
             // Bind DebugLogList to service's DebugMessages
             this.DataContext = _service;
+
+            // Subscribe to device list changes so the combo updates live while this window is open
+            // (runtime device change polling removed from service) - no live subscription needed
         }
 
         private void StartListenButton_Click(object sender, RoutedEventArgs e)
@@ -120,6 +108,53 @@ namespace VolumeFader.Midi
         {
             // Do not dispose the shared service here; ownership remains with the main window
             this.Close();
+        }
+
+        private void PopulateDeviceCombo()
+        {
+            DeviceCombo.Items.Clear();
+            int selectIndex = -1;
+            for (int i = 0; i < NAudio.Midi.MidiIn.NumberOfDevices; i++)
+            {
+                try
+                {
+                    var name = NAudio.Midi.MidiIn.DeviceInfo(i).ProductName;
+                    DeviceCombo.Items.Add(name);
+                    if (selectIndex == -1 && !string.IsNullOrEmpty(name) && name.IndexOf(DesiredDeviceName, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        selectIndex = i;
+                    }
+                }
+                catch { }
+            }
+
+            // If the service already has an active device, prefer that index (if still valid)
+            try
+            {
+                if (_service?.ActiveDeviceIndex is int activeIdx && activeIdx >= 0 && activeIdx < DeviceCombo.Items.Count)
+                {
+                    DeviceCombo.SelectedIndex = activeIdx;
+                    return;
+                }
+            }
+            catch { }
+
+             if (DeviceCombo.Items.Count > 0)
+             {
+                 if (selectIndex >= 0 && selectIndex < DeviceCombo.Items.Count)
+                     DeviceCombo.SelectedIndex = selectIndex;
+                 else
+                     DeviceCombo.SelectedIndex = 0;
+             }
+        }
+
+        public void RefreshDeviceList()
+        {
+            try
+            {
+                PopulateDeviceCombo();
+            }
+            catch { }
         }
     }
 }
