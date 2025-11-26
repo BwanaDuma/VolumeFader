@@ -47,6 +47,9 @@ namespace VolumeFader.Midi
             // Initial button states based on shared service
             StartListenButton.IsEnabled = !_service.IsRunning;
             StopListenButton.IsEnabled = _service.IsRunning;
+
+            // Bind DebugLogList to service's DebugMessages
+            this.DataContext = _service;
         }
 
         private void StartListenButton_Click(object sender, RoutedEventArgs e)
@@ -84,6 +87,15 @@ namespace VolumeFader.Midi
 
             StartListenButton.IsEnabled = !_service.IsRunning;
             StopListenButton.IsEnabled = _service.IsRunning;
+        }
+
+        private void DebugLogList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            try
+            {
+                _service.ClearDebugMessages();
+            }
+            catch { }
         }
 
         private void StopListenButton_Click(object sender, RoutedEventArgs e)

@@ -1,11 +1,16 @@
 ﻿using System;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace VolumeFader
@@ -45,6 +50,34 @@ namespace VolumeFader
 
             _midiMapFile = Path.Combine(AppContext.BaseDirectory, "midiMappings.json");
             _midiService = new Midi.MidiListenerService(_midiMapFile);
+
+            // watch for incoming messages to animate - subscribe before starting the service to avoid missed events
+            if (_midiService != null)
+            {
+                _midiService.DebugMessageLogged += (msg) => {
+                    // schedule animation on UI thread - start animation without awaiting
+                    Dispatcher.InvokeAsync(() => { _ = AnimateListeningRuns(); });
+                };
+
+                // Prefer direct MIDI notifications for animation (fired as soon as a message is received)
+                _midiService.MidiMessageReceived += () => {
+                    Dispatcher.InvokeAsync(() => { _ = AnimateListeningRuns(); });
+                };
+
+                // Also subscribe to the debug messages collection changed as a backup
+                if (_midiService.DebugMessages is System.Collections.Specialized.INotifyCollectionChanged coll)
+                {
+                    coll.CollectionChanged += (s, e) => {
+                        if (e.Action == NotifyCollectionChangedAction.Add)
+                        {
+                            Dispatcher.InvokeAsync(() => { _ = AnimateListeningRuns(); });
+                        }
+                    };
+                }
+
+                System.Diagnostics.Debug.WriteLine("MainWindow: subscribed to MIDI service debug events");
+            }
+
             // start listening on default device if available
             if (NAudio.Midi.MidiIn.NumberOfDevices > 0)
             {
@@ -52,12 +85,12 @@ namespace VolumeFader
             }
 
             // Add right-click menu to open config
-            this.MouseRightButtonUp += (s,e) => {
-                var cfg = new Midi.MidiConfigWindow(_midiMapFile, _midiService) { Owner = this };
-                cfg.ShowDialog();
-                // reload mappings after config window closes
-                _midiService.LoadMappings();
-            };
+            //this.MouseRightButtonUp += (s,e) => {
+            //    var cfg = new Midi.MidiConfigWindow(_midiMapFile, _midiService) { Owner = this };
+            //    cfg.ShowDialog();
+            //    // reload mappings after config window closes
+            //    _midiService.LoadMappings();
+            //};
         }
 
         private void AudioService_PeakLevelChanged(object sender, float peak)
@@ -364,5 +397,109 @@ namespace VolumeFader
         }
 
         public Midi.MidiListenerService? MidiService => _midiService;
+
+        private void DebugMessages_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            // Only animate when items are added
+            if (e.Action == NotifyCollectionChangedAction.Add)
+            {
+                // Start animation on UI thread but don't block
+                Dispatcher.BeginInvoke(new Action(async () => await AnimateListeningRuns()));
+            }
+        }
+
+        private bool _isAnimating = false;
+        private CancellationTokenSource? _animationCts;
+
+        private async Task AnimateListeningRuns()
+        {
+            // Cancel any currently running animation and start fresh
+            _animationCts?.Cancel();
+            _animationCts = new CancellationTokenSource();
+            var token = _animationCts.Token;
+
+            try
+            {
+                System.Diagnostics.Debug.WriteLine("AnimateListeningRuns: start (restart)");
+
+                // Find the ListeningRunsBlock TextBlock from the visual tree
+                var tb = this.FindName("ListeningRunsBlock") as TextBlock;
+                if (tb == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("AnimateListeningRuns: ListeningRunsBlock not found");
+                    return;
+                }
+
+                // Support InlineUIContainer/TextBlock children (used to tighten spacing)
+                var uiContainers = tb.Inlines.OfType<InlineUIContainer>().ToArray();
+                if (uiContainers != null && uiContainers.Length > 0)
+                {
+                    var textBlocks = uiContainers.Select(c => c.Child as TextBlock).Where(t => t != null).ToArray()!;
+                    if (textBlocks.Length > 0)
+                    {
+                        foreach (var tblock in textBlocks)
+                        {
+                            token.ThrowIfCancellationRequested();
+                            var original = tblock!.Foreground;
+                            try
+                            {
+                                tblock.Foreground = System.Windows.Media.Brushes.Red; // animate to Red
+                                await Task.Delay(250, token);
+                            }
+                            finally
+                            {
+                                tblock.Foreground = System.Windows.Media.Brushes.White; // revert to White
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // Fallback to Runs if present
+                    var runs = tb.Inlines.OfType<Run>().ToArray();
+                    if (runs != null && runs.Length > 0)
+                    {
+                        foreach (var run in runs)
+                        {
+                            token.ThrowIfCancellationRequested();
+                            var original = run.Foreground;
+                            try
+                            {
+                                run.Foreground = System.Windows.Media.Brushes.Red;
+                                await Task.Delay(250, token);
+                            }
+                            finally
+                            {
+                                run.Foreground = System.Windows.Media.Brushes.White;
+                            }
+                        }
+                    }
+                }
+
+                System.Diagnostics.Debug.WriteLine("AnimateListeningRuns: finished");
+            }
+            catch (OperationCanceledException)
+            {
+                System.Diagnostics.Debug.WriteLine("AnimateListeningRuns: cancelled");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"AnimateListeningRuns exception: {ex}");
+            }
+        }
+
+        private void ListenerStatus_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            try
+            {
+                var cfg = new Midi.MidiConfigWindow(_midiMapFile, _midiService) { Owner = this };
+                cfg.ShowDialog();
+                _midiService?.LoadMappings();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error opening MIDI config: {ex}");
+            }
+        }
     }
 }

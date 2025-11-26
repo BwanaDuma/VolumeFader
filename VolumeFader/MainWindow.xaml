@@ -511,21 +511,61 @@
                       Style="{StaticResource MuteToggleButtonStyle}"
                       Checked="MuteButton_Checked"
                       Unchecked="MuteButton_Unchecked"/>
-        <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" x:Name="ListenerStatus"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                   FontSize="24" FontWeight="Bold">
-            <TextBlock.Style>
-                <Style TargetType="TextBlock">
-                    <Setter Property="Text" Value="NOT LISTENING" />
-                    <Setter Property="Foreground" Value="Yellow" />
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding MidiService.IsRunning, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                            <Setter Property="Text" Value="LISTENING" />
-                            <Setter Property="Foreground" Value="White" />
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </TextBlock.Style>
-        </TextBlock>
+        <Grid Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" VerticalAlignment="Center" x:Name="ListenerStatusGrid" MouseRightButtonUp="ListenerStatus_MouseRightButtonUp">
+            <!-- Not listening state -->
+            <TextBlock x:Name="NotListeningText" FontSize="24" FontWeight="Bold" Foreground="Yellow" Text="NOT LISTENING" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding MidiService.IsRunning, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <!-- Listening state with per-letter runs for animation -->
+            <TextBlock x:Name="ListeningRunsBlock" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding MidiService.IsRunning, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+                <InlineUIContainer>
+                    <TextBlock Text="L" Margin="0,0,-2,0" Foreground="White"/>
+                </InlineUIContainer>
+                <InlineUIContainer>
+                    <TextBlock Text="I" Margin="0,0,-2,0" Foreground="White"/>
+                </InlineUIContainer>
+                <InlineUIContainer>
+                    <TextBlock Text="S" Margin="0,0,-2,0" Foreground="White"/>
+                </InlineUIContainer>
+                <InlineUIContainer>
+                    <TextBlock Text="T" Margin="0,0,-2,0" Foreground="White"/>
+                </InlineUIContainer>
+                <InlineUIContainer>
+                    <TextBlock Text="E" Margin="0,0,-2,0" Foreground="White"/>
+                </InlineUIContainer>
+                <InlineUIContainer>
+                    <TextBlock Text="N" Margin="0,0,-2,0" Foreground="White"/>
+                </InlineUIContainer>
+                <InlineUIContainer>
+                    <TextBlock Text="I" Margin="0,0,-2,0" Foreground="White"/>
+                </InlineUIContainer>
+                <InlineUIContainer>
+                    <TextBlock Text="N" Margin="0,0,-2,0" Foreground="White"/>
+                </InlineUIContainer>
+                <InlineUIContainer>
+                    <TextBlock Text="G" Margin="0,0,0,0" Foreground="White"/>
+                </InlineUIContainer>
+            </TextBlock>
+        </Grid>
     </Grid>
 </Window>

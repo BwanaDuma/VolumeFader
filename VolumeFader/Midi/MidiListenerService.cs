@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Linq;
 using System.ComponentModel;
+using System.Collections.ObjectModel;
+using System.Windows;
 
 namespace VolumeFader.Midi
 {
@@ -17,9 +19,15 @@ namespace VolumeFader.Midi
         private string _mapFilePath;
         private string _defaultMidiDevice = "loopMIDI Port";
 
+        // Debug message collection
+        private readonly ObservableCollection<string> _debugMessages = new ObservableCollection<string>();
+        public ReadOnlyObservableCollection<string> DebugMessages { get; }
+        private const int MaxDebugMessages = 1000;
+
         public MidiListenerService(string mapFilePath)
         {
             _mapFilePath = mapFilePath;
+            DebugMessages = new ReadOnlyObservableCollection<string>(_debugMessages);
             LoadMappings();
         }
 
@@ -30,6 +38,60 @@ namespace VolumeFader.Midi
         private void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        // Expose debug messages to UI
+        public event Action<string>? DebugMessageLogged;
+        // Event raised when a MIDI message is received (for UI animation triggers)
+        public event Action? MidiMessageReceived;
+
+        private void Log(string message)
+        {
+            try
+            {
+                System.Diagnostics.Debug.WriteLine(message);
+            }
+            catch { }
+
+            try
+            {
+                // Ensure additions to ObservableCollection happen on the UI thread
+                var app = System.Windows.Application.Current;
+                if (app != null && app.Dispatcher != null)
+                {
+                    app.Dispatcher.BeginInvoke(new Action(() => {
+                        try { _debugMessages.Add(message); } catch { }
+                    }));
+                }
+                else
+                {
+                    try { _debugMessages.Add(message); } catch { }
+                }
+            }
+            catch { }
+
+            try
+            {
+                DebugMessageLogged?.Invoke(message);
+            }
+            catch { }
+        }
+
+        public void ClearDebugMessages()
+        {
+            try
+            {
+                var app = System.Windows.Application.Current;
+                if (app != null && app.Dispatcher != null)
+                {
+                    app.Dispatcher.BeginInvoke(new Action(() => { _debugMessages.Clear(); }));
+                }
+                else
+                {
+                    _debugMessages.Clear();
+                }
+            }
+            catch { }
         }
 
         public void Start(int deviceIndex = 0)
@@ -61,7 +123,7 @@ namespace VolumeFader.Midi
 
                 if (chosenIndex == -1)
                 {
-                    System.Diagnostics.Debug.WriteLine($"No valid MIDI device index provided and no device matching '{_defaultMidiDevice}' was found. Aborting Start.");
+                    Log($"No valid MIDI device index provided and no device matching '{_defaultMidiDevice}' was found. Aborting Start.");
                     return;
                 }
             }
@@ -70,7 +132,7 @@ namespace VolumeFader.Midi
             if (_midiIn != null)
             {
                 // Already running; no-op
-                System.Diagnostics.Debug.WriteLine($"MIDI listener already running (deviceIndex={chosenIndex}).");
+                Log($"MIDI listener already running (deviceIndex={chosenIndex}).");
                 return;
             }
 
@@ -85,22 +147,22 @@ namespace VolumeFader.Midi
                 try
                 {
                     var info = MidiIn.DeviceInfo(chosenIndex);
-                    System.Diagnostics.Debug.WriteLine($"MIDI listener started on device {chosenIndex}: {info.ProductName}");
+                    Log($"MIDI listener started on device {chosenIndex}: {info.ProductName}");
                 }
                 catch
                 {
-                    System.Diagnostics.Debug.WriteLine($"MIDI listener started on device {chosenIndex}.");
+                    Log($"MIDI listener started on device {chosenIndex}.");
                 }
 
                 // Additional status line to make it explicit when the listener is running
-                System.Diagnostics.Debug.WriteLine($"MIDI listener running: {IsRunning} (deviceIndex={chosenIndex})");
+                Log($"MIDI listener running: {IsRunning} (deviceIndex={chosenIndex})");
 
                 // Notify bindings that IsRunning changed
                 OnPropertyChanged(nameof(IsRunning));
             }
             catch (NAudio.MmException mmex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to open MIDI device {chosenIndex}: {mmex}");
+                Log($"Failed to open MIDI device {chosenIndex}: {mmex}");
                 throw;
             }
         }
@@ -113,8 +175,8 @@ namespace VolumeFader.Midi
                 {
                     // Try to capture device info for logging
                     int idx = 0;
-                    var name = "";
                     //try { idx = _midiIn.DeviceNumber; } catch { }
+                    var name = "";
                     try { name = MidiIn.DeviceInfo(idx).ProductName; } catch { }
 
                     _midiIn.Stop();
@@ -123,31 +185,38 @@ namespace VolumeFader.Midi
                     _midiIn.Dispose();
                     _midiIn = null;
 
-                    System.Diagnostics.Debug.WriteLine($"MIDI listener stopped on device {idx}: {name}");
+                    Log($"MIDI listener stopped on device {idx}: {name}");
 
                     // Notify bindings that IsRunning changed
                     OnPropertyChanged(nameof(IsRunning));
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Error stopping MIDI listener: {ex}");
+                    Log($"Error stopping MIDI listener: {ex}");
                     _midiIn = null;
                     OnPropertyChanged(nameof(IsRunning));
                 }
             }
             else
             {
-                System.Diagnostics.Debug.WriteLine("MIDI listener Stop called but it was not running.");
+                Log("MIDI listener Stop called but it was not running.");
             }
         }
 
         private void MidiIn_ErrorReceived(object sender, MidiInMessageEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine($"MIDI Error: {e.RawMessage}");
+            Log($"MIDI Error: {e.RawMessage}");
         }
 
         private void MidiIn_MessageReceived(object sender, MidiInMessageEventArgs e)
         {
+            try
+            {
+                // Notify listeners immediately that a MIDI message arrived
+                MidiMessageReceived?.Invoke();
+            }
+            catch { }
+
             try
             {
                 var midiEvent = e.MidiEvent;
@@ -177,7 +246,7 @@ namespace VolumeFader.Midi
                 int channel = midiEvent.Channel;
 
                 // Debug: log the parsed MIDI message for troubleshooting
-                System.Diagnostics.Debug.WriteLine($"MIDI Received: Raw=0x{e.RawMessage:X}, Event={midiEvent}, Command={command}, Data1={data1}, Data2={data2}, Channel={channel}");
+                Log($"MIDI Received: Raw=0x{e.RawMessage:X}, Event={midiEvent}, Command={command}, Data1={data1}, Data2={data2}, Channel={channel}");
 
                 // Normalize raw hex for matching
                 string rawHex = e.RawMessage.ToString("X");
@@ -197,11 +266,11 @@ namespace VolumeFader.Midi
                             foreach (var m in rawMatches)
                             {
                                 // Debug: show which mapping matched and the keys we will send
-                                System.Diagnostics.Debug.WriteLine($"MIDI Raw Mapping matched: Raw={m.Raw} -> Keys='{m.Keys}'");
+                                Log($"MIDI Raw Mapping matched: Raw={m.Raw} -> Keys='{m.Keys}'");
 
                                 // Parse the Keys field into SendKeys syntax
                                 var sendKeys = ParseKeysToSendKeys(m.Keys);
-                                System.Diagnostics.Debug.WriteLine($"Parsed SendKeys: '{sendKeys}'");
+                                Log($"Parsed SendKeys: '{sendKeys}'");
 
                                 if (!string.IsNullOrEmpty(sendKeys))
                                 {
@@ -213,7 +282,7 @@ namespace VolumeFader.Midi
                                         }
                                         catch (Exception ex)
                                         {
-                                            System.Diagnostics.Debug.WriteLine($"Error sending keys: {ex}");
+                                            Log($"Error sending keys: {ex}");
                                         }
                                     });
                                 }
@@ -242,10 +311,10 @@ namespace VolumeFader.Midi
                     if (!string.IsNullOrEmpty(m.Keys))
                     {
                         // Debug: show which mapping matched and the keys we will send
-                        System.Diagnostics.Debug.WriteLine($"MIDI Mapping matched: Channel={channel} Command={command} Data1={data1} Data2={data2} -> Keys='{m.Keys}'");
+                        Log($"MIDI Mapping matched: Channel={channel} Command={command} Data1={data1} Data2={data2} -> Keys='{m.Keys}'");
 
                         var sendKeys = ParseKeysToSendKeys(m.Keys);
-                        System.Diagnostics.Debug.WriteLine($"Parsed SendKeys: '{sendKeys}'");
+                        Log($"Parsed SendKeys: '{sendKeys}'");
 
                         // Send keys asynchronously to avoid blocking
                         Task.Run(() => {
@@ -256,7 +325,7 @@ namespace VolumeFader.Midi
                             }
                             catch (Exception ex)
                             {
-                                System.Diagnostics.Debug.WriteLine($"Error sending keys: {ex}");
+                                Log($"Error sending keys: {ex}");
                             }
                         });
                     }
@@ -264,7 +333,7 @@ namespace VolumeFader.Midi
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Midi receive exception: {ex}");
+                Log($"Midi receive exception: {ex}");
             }
         }
 
@@ -359,7 +428,7 @@ namespace VolumeFader.Midi
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to load midi mappings: {ex}");
+                Log($"Failed to load midi mappings: {ex}");
                 _mappings = new MidiMappingsFile();
             }
         }
@@ -373,7 +442,7 @@ namespace VolumeFader.Midi
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to save midi mappings: {ex}");
+                Log($"Failed to save midi mappings: {ex}");
             }
         }
 
