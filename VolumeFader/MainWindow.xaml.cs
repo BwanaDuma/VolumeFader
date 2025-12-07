@@ -49,6 +49,14 @@ namespace VolumeFader
             UpdateVolumeSlider(_audioService.GetMasterVolume());
             UpdateMuteButton(_audioService.IsMuted());
 
+            // Set VuMeter tooltip to current default audio device name (permanent tooltip)
+            try
+            {
+                var deviceName = _audioService.DefaultDeviceName ?? "(no audio device)";
+                Dispatcher.InvokeAsync(() => { try { VuMeter.ToolTip = deviceName; } catch { } });
+            }
+            catch { }
+
             _midiMapFile = Path.Combine(AppContext.BaseDirectory, "midiMappings.json");
             _midiService = new Midi.MidiListenerService(_midiMapFile);
 
@@ -680,6 +688,94 @@ namespace VolumeFader
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"HandleDeviceDisconnectedAsync exception: {ex}");
+            }
+        }
+
+        private void RefreshAudioButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var ok = _audioService?.RefreshDefaultDevice() ?? false;
+                if (!ok)
+                {
+                    System.Windows.MessageBox.Show("Failed to refresh audio device.", "Audio Refresh", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("Audio device refreshed successfully.");
+                    // Update UI state from refreshed audio service
+                    try
+                    {
+                        UpdateVolumeSlider(_audioService.GetMasterVolume());
+                        UpdateMuteButton(_audioService.IsMuted());
+
+                        // Update permanent VuMeter tooltip to show new default device name
+                        try
+                        {
+                            var deviceName = _audioService.DefaultDeviceName ?? "(no audio device)";
+                            Dispatcher.Invoke(() => { VuMeter.ToolTip = deviceName; });
+                        }
+                        catch { }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error updating UI after audio refresh: {ex}");
+                    }
+
+                    // Animate the refresh button to indicate success
+                    try
+                    {
+                        var sb = new System.Windows.Media.Animation.Storyboard();
+                        var scaleX = new System.Windows.Media.Animation.DoubleAnimation(1.0, 1.4, new Duration(TimeSpan.FromMilliseconds(120))) { AutoReverse = true };
+                        var scaleY = new System.Windows.Media.Animation.DoubleAnimation(1.0, 1.4, new Duration(TimeSpan.FromMilliseconds(120))) { AutoReverse = true };
+
+                        // Target the RefreshAudioButton directly (more reliable than SetTargetName)
+                        System.Windows.Media.Animation.Storyboard.SetTarget(scaleX, RefreshAudioButton);
+                        System.Windows.Media.Animation.Storyboard.SetTarget(scaleY, RefreshAudioButton);
+                        System.Windows.Media.Animation.Storyboard.SetTargetProperty(scaleX, new PropertyPath("RenderTransform.ScaleX"));
+                        System.Windows.Media.Animation.Storyboard.SetTargetProperty(scaleY, new PropertyPath("RenderTransform.ScaleY"));
+
+                        sb.Children.Add(scaleX);
+                        sb.Children.Add(scaleY);
+
+                        sb.Begin();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error playing refresh animation: {ex}");
+                    }
+
+                    // Show a temporary tooltip on the refresh button to indicate success
+                    try
+                    {
+                        var originalTooltip = RefreshAudioButton.ToolTip;
+                        var tip = new System.Windows.Controls.ToolTip { Content = "Refreshed", PlacementTarget = RefreshAudioButton, IsOpen = true, StaysOpen = false };
+
+                        RefreshAudioButton.ToolTip = tip;
+
+                        // Close after 1 second and restore original tooltip
+                        Task.Run(async () => {
+                            await Task.Delay(1000);
+                            Dispatcher.Invoke(() =>
+                            {
+                                try
+                                {
+                                    tip.IsOpen = false;
+                                    RefreshAudioButton.ToolTip = originalTooltip;
+                                }
+                                catch { }
+                            });
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error showing temporary tooltip: {ex}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"RefreshAudioButton_Click exception: {ex}");
             }
         }
     }

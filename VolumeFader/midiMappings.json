@@ -1,12 +1,67 @@
 {
   "Mappings": [
     {
-      "Name": "Example Note On",
-      "Channel": 0,
-      "Command": 144,
-      "Data1": 60,
-      "Data2": 127,
-      "Keys": "{ENTER}"
+      "Name": "Start Streaming",
+      "Channel": 1,
+      "Command": 0,
+      "Data1": 0,
+      "Data2": 0,
+      "Keys": "{Alt\u002BShift\u002BD0}",
+      "Raw": "0xC0"
+    },
+    {
+      "Name": "Proclaim Only",
+      "Channel": 1,
+      "Command": 0,
+      "Data1": 1,
+      "Data2": 0,
+      "Keys": "{Alt\u002BShift\u002BD1}",
+      "Raw": "0x1C0"
+    },
+    {
+      "Name": "Camera Only",
+      "Channel": 1,
+      "Command": 0,
+      "Data1": 2,
+      "Data2": 0,
+      "Keys": "{Alt\u002BShift\u002BD2}",
+      "Raw": "0x2C0"
+    },
+    {
+      "Name": "Unused",
+      "Channel": 1,
+      "Command": 0,
+      "Data1": 3,
+      "Data2": 0,
+      "Keys": "{Alt\u002BShift\u002BD3}",
+      "Raw": "0x3C0"
+    },
+    {
+      "Name": "Camera \u002B Proclaim",
+      "Channel": 1,
+      "Command": 0,
+      "Data1": 4,
+      "Data2": 0,
+      "Keys": "{Alt\u002BShift\u002BD4}",
+      "Raw": "0x4C0"
+    },
+    {
+      "Name": "Blackout",
+      "Channel": 1,
+      "Command": 0,
+      "Data1": 5,
+      "Data2": 0,
+      "Keys": "{Alt\u002BShift\u002BD5}",
+      "Raw": "0x5C0"
+    },
+    {
+      "Name": "Stop Streaming",
+      "Channel": 1,
+      "Command": 0,
+      "Data1": 6,
+      "Data2": 0,
+      "Keys": "{Alt\u002BShift\u002BD6}",
+      "Raw": "0x6C0"
     }
   ]
 }

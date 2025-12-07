@@ -1,6 +1,6 @@
-﻿ using System;
- using NAudio.CoreAudioApi;
- using System.Timers; // Use System.Timers.Timer for background thread
+﻿using System;
+using NAudio.CoreAudioApi;
+using System.Timers; // Use System.Timers.Timer for background thread
 
 namespace VolumeFader
 {
@@ -154,6 +154,76 @@ namespace VolumeFader
                  _volumeControl.Mute = !_volumeControl.Mute;
              }
         }
+
+        public bool RefreshDefaultDevice()
+        {
+            try
+            {
+                // Unsubscribe and dispose existing objects
+                try
+                {
+                    if (_volumeControl != null)
+                    {
+                        _volumeControl.OnVolumeNotification -= OnSystemVolumeNotification;
+                        // Do not dispose here; will be disposed with device
+                    }
+                }
+                catch { }
+
+                try { _peakMeterTimer?.Stop(); } catch { }
+
+                try
+                {
+                    _volumeControl = null;
+                    _meterInformation = null;
+
+                    _defaultDevice?.Dispose();
+                    _defaultDevice = null;
+
+                    _deviceEnumerator?.Dispose();
+                    _deviceEnumerator = null;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error disposing audio devices during refresh: {ex}");
+                }
+
+                // Re-initialize
+                _deviceEnumerator = new MMDeviceEnumerator();
+                _defaultDevice = _deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+
+                if (_defaultDevice != null)
+                {
+                    _volumeControl = _defaultDevice.AudioEndpointVolume;
+                    _meterInformation = _defaultDevice.AudioMeterInformation;
+
+                    // Subscribe to system volume/mute changes
+                    _volumeControl.OnVolumeNotification += OnSystemVolumeNotification;
+
+                    // Restart peak meter timer if needed
+                    if (_peakMeterTimer == null)
+                    {
+                        _peakMeterTimer = new System.Timers.Timer(50);
+                        _peakMeterTimer.Elapsed += PeakMeterTimer_Elapsed;
+                        _peakMeterTimer.AutoReset = true;
+                    }
+
+                    _peakMeterTimer?.Start();
+
+                    return true;
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"AudioControlService Refresh Error: {ex}");
+                return false;
+            }
+        }
+
+        // Expose current default device friendly name
+        public string? DefaultDeviceName => _defaultDevice?.FriendlyName;
 
         public void Dispose()
         {
